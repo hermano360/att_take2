@@ -1,0 +1,436 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+    <title>Your Memories Soundtrack</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <link rel=stylesheet href="css/base.css"/>
+</head>
+<body>
+
+<script src="js/Three.js"></script>
+<script src="js/Detector.js"></script>
+<script src="js/Stats.js"></script>
+<script src="js/OrbitControls.js"></script>
+<script src="js/THREEx.KeyboardState.js"></script>
+<script src="js/THREEx.FullScreen.js"></script>
+<script src="js/THREEx.WindowResize.js"></script>
+
+<!-- jQuery code to display an information button and box when clicked. -->
+<script src="js/jquery-1.9.1.js"></script>
+<script src="js/jquery-ui.js"></script>
+<link rel=stylesheet href="css/jquery-ui.css" />
+<link rel=stylesheet href="css/info.css"/>
+<script src="js/info.js"></script>
+<!-- <div id="infoButton"></div>
+<div id="infoBox" title="Demo Information">
+Demo controls:
+<ul>
+<li> P: play video
+<li> Space: pause video
+<li> S: stop video
+<li> R: rewind to beginning
+</ul>
+</div> -->
+<!-- ------------------------------------------------------------ -->
+
+<div id="ThreeJS" style="position: absolute; left:0px; top:0px"></div>
+<script>
+/*
+    Three.js "tutorials by example"
+    Author: Lee Stemkoski
+    Date: July 2013 (three.js v59dev)
+*/
+
+// MAIN
+
+// standard global variables
+var container, scene, camera, renderer, controls, stats;
+var keyboard = new THREEx.KeyboardState();
+
+// custom global variables
+var video, videoImage, videoImageContext, videoTexture;
+
+var imageTexture=[];
+var imageMaterial =[];
+var acceleration = [];
+var memoryPanels = [];
+var roadLines = [];
+var objects = [];
+var cubeImages = [];
+var cubeImagesRight = [];
+var meshArray = [];
+
+init();
+animate();
+
+// FUNCTIONS
+function init()
+{
+    // SCENE
+    scene = new THREE.Scene();
+
+    // CAMERA
+    var SCREEN_WIDTH = window.innerWidth, SCREEN_HEIGHT = window.innerHeight;
+    var VIEW_ANGLE = 45, ASPECT = SCREEN_WIDTH / SCREEN_HEIGHT, NEAR = 0.1, FAR = 20000;
+    camera = new THREE.PerspectiveCamera( VIEW_ANGLE, ASPECT, NEAR, FAR);
+    scene.add(camera);
+    camera.position.set(0,150,400);
+    camera.lookAt(scene.position);
+    // RENDERER
+    if ( Detector.webgl )
+        renderer = new THREE.WebGLRenderer( {antialias:true} );
+    else
+        renderer = new THREE.CanvasRenderer();
+    renderer.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
+    // renderer.setClearColor( getRandomColor() );
+    renderer.setClearColor( 0xCCCCFF ); //0xCCCCFF periwinkle, 0x87ceeb sky blue hex
+    container = document.getElementById( 'ThreeJS' );
+    container.appendChild( renderer.domElement );
+
+    // CONTROLS
+    controls = new THREE.OrbitControls( camera, renderer.domElement );
+
+    // EVENTS
+    THREEx.WindowResize(renderer, camera);
+    THREEx.FullScreen.bindKey({ charCode : 'm'.charCodeAt(0) });
+
+    // STATS
+    stats = new Stats();
+    stats.domElement.style.position = 'absolute';
+    stats.domElement.style.bottom = '0px';
+    stats.domElement.style.zIndex = 100;
+    container.appendChild( stats.domElement );
+
+    // LIGHT
+    var light = new THREE.PointLight(0xCCCCFF);
+    light.position.set(0,250,0);
+    scene.add(light);
+
+    // FREEWAY ROAD FLOOR - INNER FLOOR OBJECT
+    var floorTexture = new THREE.ImageUtils.loadTexture( 'images/road.jpg' );
+    floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping;
+    floorTexture.repeat.set( 10, 10 );
+    var floorMaterial = new THREE.MeshBasicMaterial( { map: floorTexture, side: THREE.DoubleSide } );
+    var floorGeometry = new THREE.CircleGeometry(200, 100);
+    var floor = new THREE.Mesh(floorGeometry, floorMaterial);
+    floor.position.y = -0.5;
+    floor.rotation.x = Math.PI / 2;
+    scene.add(floor);
+
+    // MOSS FLOOR - OUTER FLOOR OBJECT
+    var floorTexture2 = new THREE.ImageUtils.loadTexture( 'images/snow.jpg' );
+    floorTexture2.wrapS = floorTexture.wrapT = THREE.RepeatWrapping;
+    floorTexture2.repeat.set( 10, 10 );
+    var floorMaterial2 = new THREE.MeshBasicMaterial( { map: floorTexture2, side: THREE.DoubleSide } );
+    var floorGeometry2 = new THREE.CubeGeometry(600, 600, 10);
+    var floor2 = new THREE.Mesh(floorGeometry2, floorMaterial2);
+    floor2.position.y = -20;
+    floor2.rotation.x = Math.PI / 2;
+    scene.add(floor2);
+
+    // SKYBOX/FOG
+    var skyBoxGeometry = new THREE.CubeGeometry( 10000, 10000, 10000 );
+    var skyBoxMaterial = new THREE.MeshBasicMaterial( { color: 0xCCCCFF, side: THREE.BackSide } );
+    var skyBox = new THREE.Mesh( skyBoxGeometry, skyBoxMaterial );
+    // scene.add(skyBox);
+    scene.fog = new THREE.FogExp2( 0xCCCCFF, 0.00025 );
+
+    //////////
+    //ADVERTISEMENT PANELS - FLAT CUBE PANELS W IMAGES MAPPED
+    var geometry = new THREE.CubeGeometry( 80, 80, 4, 4 );
+    var material = new THREE.MeshBasicMaterial( {color: 0x8d8d8d} ); //test material of plain color
+
+    //start - advertisement image map ------------------------------------------------------------
+    advertisementImage = THREE.ImageUtils.loadTexture( 'images/advertisements/coca-cola.jpg' );
+    advertisementImageMaterial = new THREE.MeshBasicMaterial( {
+      map: advertisementImage,
+    }); //advertisementImageMaterial maps to object's property that also has geometry
+    advertisementImage.wrapS = advertisementImage.wrapT = THREE.RepeatWrapping;
+    //end - advertisement image map -----------------------------------------------------------
+
+    var cube = new THREE.Mesh( geometry, advertisementImageMaterial );
+    scene.add( cube );
+    cube.position.set(-150,50,0);
+    cube.rotation.y = Math.PI/5;
+
+    var material2 = new THREE.MeshBasicMaterial( {color: 0xbada55} );
+    var cube2 = new THREE.Mesh( geometry, material2 );
+    scene.add( cube2 );
+    cube2.position.set(150,50,0);
+    cube2.rotation.y = -Math.PI/5;
+    //end - flat cube panels for advertisement signs images
+    //////////
+
+    //ARRAY OF MEMORIES IMAGES READY TO BE APPLIED AS TEXTURE
+    //images in file are named "image1.JPG, image2.JPG, image3.JPG... image10.JPG"
+    //change for loop value according to user image upload
+    for(var x=1;x<=10;x++){
+      imageTexture[x] = THREE.ImageUtils.loadTexture( 'images/testImages/image'+x+'.JPG' );
+      imageMaterial[x]= new THREE.MeshBasicMaterial( {
+        map: imageTexture[x],
+        opacity:0.4
+      });
+      imageMaterial[x].transparent=true;
+    }
+    // imageMaterial.transparent=true;
+
+    //memory panels
+    var SphereGeometry = new THREE.SphereGeometry(2, 10, 10);
+    var memoryPanels = [];
+    for (var x=0; x<10; x++) {
+        for(var y=0; y<2; y++){
+            for(var z=0; z<10; z++){
+                var randScale = 5*Math.random();
+                snowMaterial = new THREE.MeshPhongMaterial( {
+                specular: 0xffffff,
+                shading: THREE.FlatShading,
+                vertexColors: THREE.VertexColors,
+                opacity:0.2
+                } );
+                snowMaterial.transparent=true;
+                var mesh = new THREE.Mesh(SphereGeometry, snowMaterial);
+                // meshArray.push(mesh);
+                mesh.position.x = (50*x)-200; //mesh.position.x = (20*x)-100;
+                mesh.position.y = 20*y+150; //mesh.position.y = 10*y;
+                mesh.position.z = (50*z)-200; //mesh.position.z = (20*z)-200;
+                scene.add(mesh);
+                // console.log(meshArray.length, mesh.position);
+            }
+        }
+    }
+
+    // add 3D text
+    ////////////////
+    // CUSTOM TEXT//
+    ////////////////
+
+    // create a canvas element
+    var canvas1 = document.createElement('canvas');
+    var context1 = canvas1.getContext('2d');
+    context1.font = "Bold 10px Arial";
+    context1.fillStyle = 'rgb(' + (Math.floor(Math.random() * 256)) + ',' + (Math.floor(Math.random() * 256)) + ',' + (Math.floor(Math.random() * 256)) + ')';
+
+    context1.fillText('text text text', 5, 25);
+
+    textpivot = new THREE.Object3D();
+    textpivot.position.set(50, 40, 0);
+    textpivot.add( context1 );
+    scene.add( textpivot );
+
+    // canvas contents will be used for a texture
+    var texture1 = new THREE.Texture(canvas1)
+    texture1.needsUpdate = true;
+
+    var material1 = new THREE.MeshBasicMaterial( {map: texture1, side:THREE.DoubleSide } );
+    material1.transparent = true;
+
+    var mesh1 = new THREE.Mesh(
+        new THREE.PlaneGeometry(canvas1.width, canvas1.height),
+        material1
+    );
+    mesh1.position.set(140, -35, -100);
+    scene.add( mesh1 );
+    /////// draw image on canvas /////////
+
+    // create a canvas element
+    var canvas2 = document.createElement('canvas');
+    var context2 = canvas2.getContext('2d');
+    // canvas contents will be used for a texture
+    var texture2 = new THREE.Texture(canvas2);
+
+    // load an image
+    var imageObj = new Image();
+    imageObj.src = "Sound-Visualizer/images/ImageTest.jpg";
+    // after the image is loaded, this function executes
+    imageObj.onload = function()
+    {
+        context2.drawImage(imageObj, 0, 0);
+        if ( texture2 ) // checks if texture exists
+            texture2.needsUpdate = true;
+    };
+
+    var material2 = new THREE.MeshBasicMaterial( {map: texture2, side:THREE.DoubleSide} );
+    material2.transparent = true;
+
+    var mesh2 = new THREE.Mesh(
+        new THREE.PlaneGeometry(canvas2.width, canvas2.height),
+        material2
+      );
+    mesh2.position.set(140, -35, -100);
+    //end custom text
+
+
+    ///////////
+    // VIDEO //
+    ///////////
+
+    // create the video element
+    video = document.createElement( 'video' );
+    // video.id = 'video';
+    // video.type = ' video/ogg; codecs="theora, vorbis" ';
+    video.src = "videos/sintel.mp4";
+    video.load(); // must call after setting/changing source
+    video.play();
+    leftBillboards();
+    rightBillboards();
+
+    // alternative method --
+    // create DIV in HTML:
+    // <video id="myVideo" autoplay style="display:none">
+    //      <source src="videos/sintel.ogv" type='video/ogg; codecs="theora, vorbis"'>
+    // </video>
+    // and set JS variable:
+    // video = document.getElementById( 'myVideo' );
+
+    videoImage = document.createElement( 'canvas' );
+    videoImage.width = 480;
+    videoImage.height = 204;
+
+    videoImageContext = videoImage.getContext( '2d' );
+    // background color if no video present
+    videoImageContext.fillStyle = '#000000';
+    videoImageContext.fillRect( 0, 0, videoImage.width, videoImage.height );
+
+    videoTexture = new THREE.Texture( videoImage );
+    videoTexture.minFilter = THREE.LinearFilter;
+    videoTexture.magFilter = THREE.LinearFilter;
+
+    var movieMaterial = new THREE.MeshBasicMaterial( { map: videoTexture, overdraw: true, side:THREE.DoubleSide } );
+    // the geometry on which the movie will be displayed;
+    //      movie image will be scaled to fit these dimensions.
+    var movieGeometry = new THREE.PlaneGeometry( 240, 100, 4, 4 );
+    var movieScreen = new THREE.Mesh( movieGeometry, movieMaterial );
+    movieScreen.position.set(0,50,-100);
+    scene.add(movieScreen);
+
+    camera.position.set(0,150,300);
+    camera.lookAt(movieScreen.position);
+}
+
+function getRandomColor () {
+    var hex = Math.floor(Math.random() * 0xFFFFFF);
+    return "#" + ("000000" + hex.toString(16)).substr(-6);
+}
+
+function rightBillboards(){
+    var vector = new THREE.Vector3();
+    for ( var i = 1, l =10; i <= l; i ++ ) {
+        var randScale = 5*Math.random();
+        var phi = Math.acos( -1 + ( 2 * i ) / l );
+        var theta = Math.sqrt( l * Math.PI ) * phi;
+        var cubegeometry = new THREE.CubeGeometry(60, 44, 1, 1);
+
+        cubeImagesRight[i] = new THREE.Mesh(cubegeometry,imageMaterial[i]);
+        cubeImagesRight[i].doubleSided = true;
+
+        // cubeImages[i].position.x = 130 * Math.cos( theta ) * Math.sin( phi );
+        // cubeImages[i].position.y = 130 * Math.sin( theta ) * Math.sin( phi );
+        cubeImagesRight[i].position.z = 130 * Math.cos( phi );
+
+        vector.copy( cubeImagesRight[i].position ).multiplyScalar( 2 );
+
+        cubeImagesRight[i].lookAt( vector );
+        cubeImagesRight[i].position.x = 100;
+
+        objects.push( cubeImagesRight[i] );
+        scene.add(cubeImagesRight[i]);
+    }
+}
+function leftBillboards(){
+    var vector = new THREE.Vector3();
+    for ( var i = 1, l =10; i <= l; i ++ ) {
+        var randScale = 5*Math.random();
+        var phi = Math.acos( -1 + ( 2 * i ) / l );
+        var theta = Math.sqrt( l * Math.PI ) * phi;
+        var cubegeometry = new THREE.CubeGeometry(60, 44, 1, 1);
+
+        cubeImages[i] = new THREE.Mesh(cubegeometry,imageMaterial[i]);
+        cubeImages[i].doubleSided = true;
+
+        // cubeImages[i].position.x = 130 * Math.cos( theta ) * Math.sin( phi );
+        // cubeImages[i].position.y = 130 * Math.sin( theta ) * Math.sin( phi );
+        cubeImages[i].position.z = 130 * Math.cos( phi );
+
+        vector.copy( cubeImages[i].position ).multiplyScalar( 2 );
+
+        cubeImages[i].lookAt( vector );
+        cubeImages[i].position.x = -100;
+
+        objects.push( cubeImages[i] );
+        scene.add(cubeImages[i]);
+    }
+}
+
+var steps = 0; //instantiation of variable that changes value for constant animation
+
+function animate()
+{
+    requestAnimationFrame( animate );
+
+    steps+=0.04; //value is constantly added to create animation
+
+    // move billboard of memory images
+    var k = 1;
+    for (var x=1; x<=10; x++){
+        var randScale = .5*Math.random();
+        console.log("1"+randScale);
+        acceleration[x] = -300+(10*k)*steps % 500; //0 - 8 mod 220
+        cubeImages[x].position.z = acceleration[x]+randScale;
+        cubeImages[x].position.y = 130;
+        k++;
+        //console.log(acceleration[x]);
+    }
+    for (var x=1; x<=10; x++){
+        var randScale = .5*Math.random();
+        console.log("1"+randScale);
+        acceleration[x] = -300+(10*k)*steps % 500; //0 - 8 mod 220
+        cubeImagesRight[x].position.z = acceleration[x]+randScale;
+        cubeImagesRight[x].position.y = 130;
+        k++;
+        //console.log(acceleration[x]);
+    }
+    //end move billboard of memory images
+
+    render();
+    update();
+}
+
+function update()
+{
+    if ( keyboard.pressed("p") )
+        video.play();
+
+    if ( keyboard.pressed("space") )
+        video.pause();
+
+    if ( keyboard.pressed("s") ) // stop video
+    {
+        video.pause();
+        video.currentTime = 0;
+    }
+
+    if ( keyboard.pressed("r") ) // rewind video
+        video.currentTime = 0;
+
+    controls.update();
+    stats.update();
+}
+
+function render()
+{
+    if ( video.readyState === video.HAVE_ENOUGH_DATA )
+    {
+        videoImageContext.drawImage( video, 0, 0 );
+        if ( videoTexture )
+            videoTexture.needsUpdate = true;
+    }
+
+    renderer.render( scene, camera );
+}
+
+</script>
+
+</body>
+</html>
