@@ -1,4 +1,4 @@
-
+﻿
 <!doctype html>
 <html lang="en">
 <head>
@@ -17,6 +17,7 @@
 <script src="js/THREEx.KeyboardState.js"></script>
 <script src="js/THREEx.FullScreen.js"></script>
 <script src="js/THREEx.WindowResize.js"></script>
+<script src="//use.fontawesome.com/a53083b203.js"></script>
 
 <!-- jQuery code to display an information button and box when clicked. -->
 <script src="js/jquery-1.9.1.js"></script>
@@ -554,7 +555,34 @@ function render()
     renderer.render( scene, camera );
 }
 
+
+    $(document).ready(function () {
+        $('#idVidPlay').on('click', function () {
+            if ($(this).hasClass('fa-pause')) {
+                video.pause();
+                $(this).removeClass('fa-pause').addClass('fa-play');
+            } else {
+                video.play();
+                $(this).removeClass('fa-play').addClass('fa-pause');
+            }
+        });
+        $('#idVidReplay').on('click', function () {
+            video.currentTime = 0;
+            video.play();
+            $('#idVidPlay').removeClass('fa-play').addClass('fa-pause');
+        });
+    });
 </script>
 
+    <div id="idVidControls" style="z-index:9999;padding:20px 0px 20px 0px;height:40px;background-color:rgba(120, 120, 120, 0.35);position:absolute;bottom:0px;width:100%">
+        <div style="display:table;margin:0 auto;">
+            <a class="btn btn-default">
+                <i id="idVidPlay" class="fa fa-pause fa-2x" style="cursor:pointer;border:2px solid grey;padding:6px;border-radius:6px;" aria-hidden="true"></i>
+            </a>
+            <a class="btn btn-default">
+                <i id="idVidReplay" class="fa fa-undo fa-2x" style="cursor:pointer;border:2px solid grey;padding:6px;border-radius:6px;" aria-hidden="true"></i>
+            </a>
+        </div>
+    </div>
 </body>
 </html>
