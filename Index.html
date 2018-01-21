@@ -2,15 +2,16 @@
 <!doctype html>
 <html lang="en">
 <head>
-    <title>Your Memories Soundtrack</title>
+    <title>Memory Lane</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
     <link rel=stylesheet href="css/base.css"/>
 </head>
 <body>
 
-<script src="js/Three.js"></script>
+<script src="js/three.min.js"></script>
 <script src="js/Detector.js"></script>
+<script src="js/STLLoader.js"></script>
 <script src="js/Stats.js"></script>
 <script src="js/OrbitControls.js"></script>
 <script src="js/THREEx.KeyboardState.js"></script>
@@ -34,6 +35,13 @@ Demo controls:
 </ul>
 </div> -->
 <!-- ------------------------------------------------------------ -->
+<div id="blocker">
+    <div id="instructions">
+        <span style="font-size:40px">- discover your personalized content -</span>
+        <br />
+        (W, A, S, D = Move, SPACE = Jump, MOUSE = Look around)
+    </div>
+</div>
 
 <div id="ThreeJS" style="position: absolute; left:0px; top:0px"></div>
 <script>
@@ -56,11 +64,22 @@ var imageTexture=[];
 var imageMaterial =[];
 var acceleration = [];
 var memoryPanels = [];
-var roadLines = [];
+// var roadLines = [];
 var objects = [];
 var cubeImages = [];
 var cubeImagesRight = [];
 var meshArray = [];
+var mesh = [];
+
+var roadLineRight = []; //inner yellow road lines
+var roadLineLeft = [];
+
+var treeMesh = [];
+var treeGeometry;
+var treeLoader; //christmas trees
+var treePivotPoint;
+
+var snowMaterial;
 
 init();
 animate();
@@ -124,14 +143,14 @@ function init()
     floorTexture2.wrapS = floorTexture.wrapT = THREE.RepeatWrapping;
     floorTexture2.repeat.set( 10, 10 );
     var floorMaterial2 = new THREE.MeshBasicMaterial( { map: floorTexture2, side: THREE.DoubleSide } );
-    var floorGeometry2 = new THREE.CubeGeometry(600, 600, 10);
+    var floorGeometry2 = new THREE.BoxGeometry(600, 600, 10);
     var floor2 = new THREE.Mesh(floorGeometry2, floorMaterial2);
     floor2.position.y = -20;
     floor2.rotation.x = Math.PI / 2;
     scene.add(floor2);
 
     // SKYBOX/FOG
-    var skyBoxGeometry = new THREE.CubeGeometry( 10000, 10000, 10000 );
+    var skyBoxGeometry = new THREE.BoxGeometry( 10000, 10000, 10000 );
     var skyBoxMaterial = new THREE.MeshBasicMaterial( { color: 0xCCCCFF, side: THREE.BackSide } );
     var skyBox = new THREE.Mesh( skyBoxGeometry, skyBoxMaterial );
     // scene.add(skyBox);
@@ -139,7 +158,7 @@ function init()
 
     //////////
     //ADVERTISEMENT PANELS - FLAT CUBE PANELS W IMAGES MAPPED
-    var geometry = new THREE.CubeGeometry( 80, 80, 4, 4 );
+    var geometry = new THREE.BoxGeometry( 80, 80, 4, 4 );
     var material = new THREE.MeshBasicMaterial( {color: 0x8d8d8d} ); //test material of plain color
 
     //start - advertisement image map ------------------------------------------------------------
@@ -156,12 +175,38 @@ function init()
     cube.rotation.y = Math.PI/5;
 
     var material2 = new THREE.MeshBasicMaterial( {color: 0xbada55} );
-    var cube2 = new THREE.Mesh( geometry, material2 );
+    var cube2 = new THREE.Mesh( geometry, advertisementImageMaterial );
     scene.add( cube2 );
     cube2.position.set(150,50,0);
     cube2.rotation.y = -Math.PI/5;
     //end - flat cube panels for advertisement signs images
     //////////
+
+    //ROAD LINE MATERIAL
+    var shortLinegeometry = new THREE.BoxGeometry( 1, 1, 50 ); //inner road lines
+    var longLinegeometry = new THREE.BoxGeometry( 1, 1, 1000 ); //outer road lines
+
+    var yellowLine = new THREE.MeshBasicMaterial( {color: 0xCCCC00} ); //inner road lines
+    var whiteLine = new THREE.MeshBasicMaterial( {color: 0xffffff} ); //outer road lines
+
+    for (var x=0;x<10;x++){
+        roadLineLeft[x] = new THREE.Mesh( shortLinegeometry, yellowLine ); //inner road lines
+        roadLineRight[x] = new THREE.Mesh( shortLinegeometry, yellowLine );
+
+        roadLineLeft[x].position.x = -50; //inner road lines
+        roadLineRight[x].position.x = 50;
+
+        scene.add( roadLineLeft[x] );
+        scene.add( roadLineRight[x] );
+    }
+
+    var roadEndLeft = new THREE.Mesh( longLinegeometry, whiteLine ); //outer road lines
+    var roadEndRight = new THREE.Mesh( longLinegeometry, whiteLine );
+
+    roadEndLeft.position.x = -150; //outer road lines
+    roadEndRight.position.x = 150;
+    scene.add( roadEndLeft );
+    scene.add( roadEndRight );
 
     //ARRAY OF MEMORIES IMAGES READY TO BE APPLIED AS TEXTURE
     //images in file are named "image1.JPG, image2.JPG, image3.JPG... image10.JPG"
@@ -176,26 +221,36 @@ function init()
     }
     // imageMaterial.transparent=true;
 
-    //memory panels
+    //SNOW MATERIAL
+    var snowMaterial = new THREE.MeshBasicMaterial( {
+        specular: 0xffffff,
+        shading: THREE.FlatShading,
+        vertexColors: THREE.VertexColors,
+        opacity:0.5
+    } );
+    snowMaterial.transparent=true;
+
+    //white transparent shapes on top
+    snowPivotPoint = new THREE.Object3D();
+    scene.add( snowPivotPoint );
     var SphereGeometry = new THREE.SphereGeometry(2, 10, 10);
-    var memoryPanels = [];
-    for (var x=0; x<10; x++) {
+    // var memoryPanels = [];
+    for (var x=0; x<20; x++) {
         for(var y=0; y<2; y++){
-            for(var z=0; z<10; z++){
+            for(var z=0; z<20; z++){
                 var randScale = 5*Math.random();
-                snowMaterial = new THREE.MeshPhongMaterial( {
-                specular: 0xffffff,
-                shading: THREE.FlatShading,
-                vertexColors: THREE.VertexColors,
-                opacity:0.2
-                } );
-                snowMaterial.transparent=true;
-                var mesh = new THREE.Mesh(SphereGeometry, snowMaterial);
+
+                mesh[x] = new THREE.Mesh(SphereGeometry, snowMaterial);
                 // meshArray.push(mesh);
-                mesh.position.x = (50*x)-200; //mesh.position.x = (20*x)-100;
-                mesh.position.y = 20*y+150; //mesh.position.y = 10*y;
-                mesh.position.z = (50*z)-200; //mesh.position.z = (20*z)-200;
-                scene.add(mesh);
+                mesh[x].position.x = (50*x)-400; //mesh.position.x = (20*x)-100;
+                mesh[x].position.y = 50*y+200; //mesh.position.y = 10*y;
+                mesh[x].position.z = (50*z)-500; //mesh.position.z = (20*z)-200;
+                mesh[x].scale.set(randScale, randScale, randScale); //mesh.position.z = (20*z)-200;
+                scene.add(mesh[x]);
+
+                snowPivotPoint.add( mesh[x] );
+                scene.add( snowPivotPoint );
+                // console.log(x+" "+meshArray.length);
                 // console.log(meshArray.length, mesh.position);
             }
         }
@@ -262,6 +317,43 @@ function init()
     //end custom text
 
 
+    //LOAD 3D TREE
+    treePivotPoint = new THREE.Object3D();
+    scene.add( treePivotPoint );
+
+    treeLoader = new THREE.STLLoader();
+    treeLoader.addEventListener( 'load', function ( event ) {
+        var treeGeometry = event.content;
+        treeGeometry.computeTangents();
+
+        for(var x=0; x<=5; x++){
+            treeMesh[x] = new THREE.Mesh( treeGeometry, snowMaterial );//Math.floor(Math.random() * 201) - 100
+            treeMesh[x].rotation.set( - Math.PI / 2, 0, 0.5);
+            treeMesh[x].scale.set( .5, .5, .5 );
+            treeMesh[x].castShadow = true;
+            treeMesh[x].receiveShadow = true;
+
+            objects.push(treeMesh[x]);
+            scene.add(treeMesh[x]);
+
+            treePivotPoint.add( treeMesh[x] );
+            scene.add( treePivotPoint );
+            // console.log("stl test");
+        }
+        // treeMesh.forEach(function(element, index, array) {
+        //     scene.add(element); // initial add to the scene
+        // });
+
+        treeMesh[0].position.set(230, 10, -230);
+        treeMesh[1].position.set(-230, 10, -630);
+        treeMesh[2].position.set(230, 10, 230);
+        treeMesh[3].position.set(-230, 10, 230);
+        treeMesh[4].position.set(385, 10, -530);
+        treeMesh[5].position.set(-470, 10, -230);
+    } ); // end loads palmTreeMesh into the scene----------------------------------------------
+    treeLoader.load('3dModels/tree.stl');
+    //END LOAD 3D TREE
+
     ///////////
     // VIDEO //
     ///////////
@@ -320,7 +412,7 @@ function rightBillboards(){
         var randScale = 5*Math.random();
         var phi = Math.acos( -1 + ( 2 * i ) / l );
         var theta = Math.sqrt( l * Math.PI ) * phi;
-        var cubegeometry = new THREE.CubeGeometry(60, 44, 1, 1);
+        var cubegeometry = new THREE.BoxGeometry(60, 44, 1, 1);
 
         cubeImagesRight[i] = new THREE.Mesh(cubegeometry,imageMaterial[i]);
         cubeImagesRight[i].doubleSided = true;
@@ -344,7 +436,7 @@ function leftBillboards(){
         var randScale = 5*Math.random();
         var phi = Math.acos( -1 + ( 2 * i ) / l );
         var theta = Math.sqrt( l * Math.PI ) * phi;
-        var cubegeometry = new THREE.CubeGeometry(60, 44, 1, 1);
+        var cubegeometry = new THREE.BoxGeometry(60, 44, 1, 1);
 
         cubeImages[i] = new THREE.Mesh(cubegeometry,imageMaterial[i]);
         cubeImages[i].doubleSided = true;
@@ -375,23 +467,55 @@ function animate()
     var k = 1;
     for (var x=1; x<=10; x++){
         var randScale = .5*Math.random();
-        console.log("1"+randScale);
-        acceleration[x] = -300+(10*k)*steps % 500; //0 - 8 mod 220
+        // console.log("1"+randScale);
+        acceleration[x] = -300+(3*k)*steps % 500; //0 - 8 mod 220
         cubeImages[x].position.z = acceleration[x]+randScale;
         cubeImages[x].position.y = 130;
         k++;
+
         //console.log(acceleration[x]);
     }
     for (var x=1; x<=10; x++){
         var randScale = .5*Math.random();
-        console.log("1"+randScale);
-        acceleration[x] = -300+(10*k)*steps % 500; //0 - 8 mod 220
+        // console.log("1"+randScale);
+        acceleration[x] = -300+(3*k)*steps % 500; //0 - 8 mod 220
         cubeImagesRight[x].position.z = acceleration[x]+randScale;
         cubeImagesRight[x].position.y = 130;
         k++;
         //console.log(acceleration[x]);
     }
+    // roadLineRight.position.z = -300+(10*k)*steps % 500;
+    // for (var x=1; x<=5; x++){
+    //     var randScale = .5*Math.random();
+    //     console.log("1"+randScale);
+    //     acceleration[x] = -300+(10*k)*steps % 500; //0 - 8 mod 220
+    //     roadLineRight.position.z = acceleration[x]+randScale;
+    //     roadLineRight.position.y = 10;
+    //     k++;
+    //     //console.log(acceleration[x]);
+    // }
     //end move billboard of memory images
+
+    //ROAD LINES MOVE - start
+    for (var x=0; x<10; x++){
+        // roadLineLeft[x].position.z = -300+(10*k)*steps % 500;
+        // roadLineRight[x].position.z = -300+(10*k)*steps % 500;
+        // console.log("1"+randScale);
+        acceleration[x] = -500+(500)*steps % 1000; //0 - 8 mod 220
+        roadLineRight[x].position.z = acceleration[x];
+        roadLineLeft[x].position.z = acceleration[x];
+    }
+    //ROAD LINES MOVE - end
+
+    snowPivotPoint.position.y = 100+(50*(Math.cos(steps)));
+
+    //TREE MOVE - start
+    for (var x=0; x<=5; x++){
+        var randScale = .5*Math.random();
+        acceleration[x] = -500+(300)*steps % 1000; //0 - 8 mod 220
+        treePivotPoint.position.z = acceleration[x];
+    }
+    //TREE MOVE - end
 
     render();
     update();
